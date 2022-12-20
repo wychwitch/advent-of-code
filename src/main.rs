@@ -41,7 +41,8 @@ pub fn advent_get_elf_calorie_totals() -> Vec<i32> {
 pub fn advent_day_1() {
     let elf_calorie_totals = advent_get_elf_calorie_totals();
     println!(
-        "Top 3 elves total: {}",
+        "Top Elf:{}, Top 3 elves total: {}",
+        elf_calorie_totals[0],
         elf_calorie_totals[0] + elf_calorie_totals[1] + elf_calorie_totals[2]
     );
 }
