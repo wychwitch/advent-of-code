@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 
 pub fn advent_get_elf_calories() -> Vec<Vec<i32>> {
@@ -5,6 +6,7 @@ pub fn advent_get_elf_calories() -> Vec<Vec<i32>> {
     let contents = fs::read_to_string(file_path).expect("Should've been able to read file");
     let string_vecs: Vec<&str> = contents.split("\n\n").collect();
     let mut elves: Vec<Vec<i32>> = Vec::new();
+
     for block in &string_vecs {
         let mut elf: Vec<i32> = Vec::new();
         for calorie in block.split("\n") {
@@ -51,80 +53,67 @@ pub fn advent_process_rps_input() -> i32 {
     let file_path = "input2.txt";
     let contents = fs::read_to_string(file_path).expect("Should've been able to read file");
     let rounds_combined: Vec<&str> = contents.split("\n").collect();
-    let mut rounds: Vec<(&str, &str)> = Vec::new();
-    let score_rounds: Vec<i32>;
 
-    for round in rounds_combined {
-        let mut rounds_split = round.split(" ");
-        rounds.push((rounds_split.next().unwrap(), rounds_split.next().unwrap()));
-    }
-    let rounds_typed: Vec<(RPS, RPS)> = rounds
+    let my_round_scores: Vec<i32>;
+    let opponent_shape_map = HashMap::from([("A", 1), ("B", 2), ("C", 3)]);
+    let my_shape_map = HashMap::from([("X", 1), ("Y", 2), ("Z", 3)]);
+    let rounds_raw: Vec<(&str, &str)> = rounds_combined
         .into_iter()
-        .map(|round| {
-            let l = match round.0 {
-                "A" => RPS::Rock(1),
-                "B" => RPS::Paper(2),
-                "C" => RPS::Scissors(3),
-                _ => panic!("Should've matched an enum!"),
-            };
-            let r = match round.1 {
-                "X" => RPS::Rock(1),
-                "Y" => RPS::Paper(2),
-                "Z" => RPS::Scissors(3),
-                _ => panic!("Should've matched an enum!"),
-            };
-            (l, r)
+        .filter_map(|round| match round {
+            "\n" => None,
+            _ => round.split_once(" "),
         })
         .collect();
 
-    enum RPS {
-        Rock(i32),
-        Paper(i32),
-        Scissors(i32),
+    #[derive(Debug)]
+    struct Move {
+        shape: i32,
+        bonus: i32,
     }
 
-    score_rounds = rounds_typed
+    impl Move {
+        pub fn get_total(&self) -> i32 {
+            self.shape + self.bonus
+        }
+    }
+    let rounds: Vec<(Move, Move)> = rounds_raw
         .into_iter()
         .map(|round| {
-            let mut my_score = 0;
-            match round.0 {
-                RPS::Paper(n) => my_score += n,
-                RPS::Rock(n) => my_score += n,
-                RPS::Scissors(n) => my_score += n,
-            }
-            match round.1 {
-                RPS::Rock(m) => {
-                    if my_score > m {
-                        my_score + 6
-                    } else if my_score == m {
-                        my_score + 3
-                    } else {
-                        my_score
-                    }
-                }
-                RPS::Paper(m) => {
-                    if my_score > m {
-                        my_score + 6
-                    } else if my_score == m {
-                        my_score + 3
-                    } else {
-                        my_score
-                    }
-                }
-                RPS::Scissors(m) => {
-                    if my_score > m {
-                        my_score + 6
-                    } else if my_score == m {
-                        my_score + 3
-                    } else {
-                        my_score
-                    }
-                }
-            }
+            let (opponent_shape, my_shape) = round;
+            let my_bonus: i32;
+            let opponent_bonus: i32;
+            if my_shape > opponent_shape {
+                my_bonus = 6;
+                opponent_bonus = 0;
+            } else if my_shape == opponent_shape {
+                my_bonus = 3;
+                opponent_bonus = 3;
+            } else {
+                my_bonus = 0;
+                opponent_bonus = 0;
+            };
+
+            let opponent = Move {
+                shape: opponent_shape_map[opponent_shape],
+                bonus: opponent_bonus,
+            };
+            let me = Move {
+                shape: my_shape_map[my_shape],
+                bonus: my_bonus,
+            };
+            (opponent, me)
         })
         .collect();
 
-    score_rounds.into_iter().sum()
+    my_round_scores = rounds
+        .into_iter()
+        .map(|round| {
+            let (_, my_round) = round;
+            my_round.get_total()
+        })
+        .collect();
+
+    my_round_scores.into_iter().sum()
 }
 
 pub fn advent_day_2() {}
