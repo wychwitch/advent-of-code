@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 
 pub fn advent_get_elf_calories() -> Vec<Vec<i32>> {
@@ -49,14 +48,14 @@ pub fn advent_day_1() {
     );
 }
 
-pub fn advent_process_rps_input() -> i32 {
+pub fn advent_process_rps_input() -> (Vec<i32>, Vec<i32>) {
     let file_path = "input2.txt";
     let contents = fs::read_to_string(file_path).expect("Should've been able to read file");
     let rounds_combined: Vec<&str> = contents.split("\n").collect();
-
+    let rounds: Vec<(Move, Move)>;
+    let cheated_rounds: Vec<(Move, Move)>;
     let my_round_scores: Vec<i32>;
-    let opponent_shape_map = HashMap::from([("A", 1), ("B", 2), ("C", 3)]);
-    let my_shape_map = HashMap::from([("X", 1), ("Y", 2), ("Z", 3)]);
+    let my_cheated_round_scores: Vec<i32>;
     let rounds_raw: Vec<(&str, &str)> = rounds_combined
         .into_iter()
         .filter_map(|round| match round {
@@ -66,46 +65,144 @@ pub fn advent_process_rps_input() -> i32 {
         .collect();
 
     #[derive(Debug)]
+    struct Cheat {
+        goal: String,
+    }
+
+    impl Cheat {
+        pub fn new(goal: &str) -> Cheat {
+            Cheat {
+                goal: match goal {
+                    "X" => "Lose".to_string(),
+                    "Y" => "Draw".to_string(),
+                    "Z" => "Win".to_string(),
+                    _ => panic!("Whoops!! Broken match!"),
+                },
+            }
+        }
+        pub fn cheated_move(&self, opponent: &Move) -> Move {
+            match self.goal.as_str() {
+                "Lose" => match opponent.shape.as_str() {
+                    "Rock" => Move::new("C"),
+                    "Paper" => Move::new("A"),
+                    "Scissors" => Move::new("B"),
+                    _ => panic!("match failed!"),
+                },
+                "Draw" => match opponent.shape.as_str() {
+                    "Rock" => Move::new("A"),
+                    "Paper" => Move::new("B"),
+                    "Scissors" => Move::new("C"),
+                    _ => panic!("match failed!"),
+                },
+                "Win" => match opponent.shape.as_str() {
+                    "Rock" => Move::new("B"),
+                    "Paper" => Move::new("C"),
+                    "Scissors" => Move::new("A"),
+                    _ => panic!("match failed!"),
+                },
+                _ => panic!("match failed!"),
+            }
+        }
+    }
+
+    #[derive(Debug)]
     struct Move {
-        shape: i32,
+        shape: String,
+        score: i32,
         bonus: i32,
     }
 
     impl Move {
+        pub fn new(shape_key: &str) -> Move {
+            let shape: &str = match shape_key {
+                "A" => "Rock",
+                "B" => "Paper",
+                "C" => "Scissors",
+                //for backwards compatibility with pt 1
+                "X" => "Rock",
+                "Y" => "Paper",
+                "Z" => "Scissors",
+                _ => panic!("Huh! somehow the key wasn't right?"),
+            };
+            Move {
+                shape: shape.to_string(),
+                score: match shape {
+                    "Rock" => 1,
+                    "Paper" => 2,
+                    "Scissors" => 3,
+                    _ => panic!("Huh! somehow the key wasn't right?"),
+                },
+                bonus: 0,
+            }
+        }
         pub fn get_total(&self) -> i32 {
-            self.shape + self.bonus
+            self.score + self.bonus
+        }
+
+        pub fn process_round(opponent: &mut Move, me: &mut Move) {
+            let my_shape = me.shape.to_string();
+            let opp_shape = opponent.shape.to_string();
+            if my_shape == opp_shape {
+                me.bonus = 3;
+                opponent.bonus = 3;
+            } else if &my_shape == "Rock" {
+                if &opp_shape == "Paper" {
+                    me.bonus = 0;
+                    opponent.bonus = 6;
+                } else {
+                    me.bonus = 6;
+                    opponent.bonus = 0;
+                }
+            } else if &my_shape == "Scissors" {
+                if &opp_shape == "Rock" {
+                    me.bonus = 0;
+                    opponent.bonus = 6;
+                } else {
+                    me.bonus = 6;
+                    opponent.bonus = 0;
+                }
+            } else if &my_shape == "Paper" {
+                if &opp_shape == "Scissors" {
+                    me.bonus = 0;
+                    opponent.bonus = 6;
+                } else {
+                    me.bonus = 6;
+                    opponent.bonus = 0;
+                }
+            }
         }
     }
-    let rounds: Vec<(Move, Move)> = rounds_raw
+    rounds = rounds_raw
+        .iter()
+        .cloned()
+        .map(|round| {
+            let (opponent_shape_key, my_shape_key) = round;
+            let mut opponent_move = Move::new(opponent_shape_key);
+            let mut my_move = Move::new(my_shape_key);
+            Move::process_round(&mut opponent_move, &mut my_move);
+            (opponent_move, my_move)
+        })
+        .collect();
+    cheated_rounds = rounds_raw
         .into_iter()
         .map(|round| {
-            let (opponent_shape, my_shape) = round;
-            let my_bonus: i32;
-            let opponent_bonus: i32;
-            if my_shape > opponent_shape {
-                my_bonus = 6;
-                opponent_bonus = 0;
-            } else if my_shape == opponent_shape {
-                my_bonus = 3;
-                opponent_bonus = 3;
-            } else {
-                my_bonus = 0;
-                opponent_bonus = 0;
-            };
-
-            let opponent = Move {
-                shape: opponent_shape_map[opponent_shape],
-                bonus: opponent_bonus,
-            };
-            let me = Move {
-                shape: my_shape_map[my_shape],
-                bonus: my_bonus,
-            };
-            (opponent, me)
+            let (opponent_shape_key, my_goal_key) = round.clone();
+            let mut opponent_move = Move::new(opponent_shape_key);
+            let cheat = Cheat::new(my_goal_key);
+            let mut my_move = cheat.cheated_move(&opponent_move);
+            Move::process_round(&mut opponent_move, &mut my_move);
+            (opponent_move, my_move)
         })
         .collect();
 
     my_round_scores = rounds
+        .iter()
+        .map(|round| {
+            let (_, my_round) = round;
+            my_round.get_total()
+        })
+        .collect();
+    my_cheated_round_scores = cheated_rounds
         .into_iter()
         .map(|round| {
             let (_, my_round) = round;
@@ -113,12 +210,17 @@ pub fn advent_process_rps_input() -> i32 {
         })
         .collect();
 
-    my_round_scores.into_iter().sum()
+    (my_round_scores, my_cheated_round_scores)
 }
 
-pub fn advent_day_2() {}
+pub fn advent_day_2() {
+    let (day_2_1_vec, day_2_2_vec) = advent_process_rps_input();
+    let day_2_1: i32 = day_2_1_vec.into_iter().sum();
+    let day_2_2: i32 = day_2_2_vec.into_iter().sum();
+    println!("RPS score: {}\n Cheated: {}", day_2_1, day_2_2);
+}
 
 fn main() {
     //advent_day_1();
-    println!("RPS score: {}", advent_process_rps_input());
+    advent_day_2();
 }
